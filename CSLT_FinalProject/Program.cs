@@ -1,226 +1,191 @@
 ﻿using System;
+using WMPLib;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Text;
 
-class Program
+Console.OutputEncoding = Encoding.UTF8;
+Exception? exception = null;
+
+bool playAgain;
+do
 {
-    static void Main()
+    playAgain = false; // Khởi tạo trạng thái "chơi lại"
+    DisplayBanner();
+    DisplayInstructions();
+
+    string playerName = GetPlayerName();
+    CenterTextHorizontally($"Welcome, {playerName}!");
+
+    int speedInput;
+    string prompt = $"SELECT SPEED: [1] SLOW | [2] NORMAL (default) | [3] FAST: ";
+    string? input;
+    Console.ForegroundColor = ConsoleColor.Green;
+
+    // Calculate the starting position to center the prompt horizontally
+    int consoleWidth = Console.WindowWidth; // Get the width of the console window
+    int startPosition = (consoleWidth - prompt.Length) / 2; // Center alignment calculation
+     
+    // Print the prompt at the calculated centered position
+    Console.SetCursorPosition(startPosition, Console.CursorTop); // Move the cursor to the starting position
+    Console.Write(prompt); // Display the prompt message
+
+    // Position the cursor immediately after the prompt for user input
+    Console.SetCursorPosition(startPosition + prompt.Length, Console.CursorTop);
+
+    while (!int.TryParse(input = Console.ReadLine(), out speedInput) || speedInput < 1 || 3 < speedInput)
     {
-        Console.OutputEncoding = System.Text.Encoding.UTF8;  // Correctly displays UTF-8 characters (special symbols, accented letters, and other Unicode characters).
-
-        // Display the banner at the start of the game
-        DisplayBanner();
-
-        // Display game instructions to guide the player on how to play
-        DisplayInstructions();
-
-        // Get player's name  
-        string playerName = GetPlayerName();
-        CenterTextHorizontally($"Welcome, {playerName}!");
-
-        Exception? exception = null;
-        int speedInput;   // Variable to store the user's speed input
-        string prompt = $"Select speed [1], [2] (default), or [3]: "; // Prompt message
-        string? input; //Variable to hold user input as a string
-
-        // Change text color for the prompt
-        Console.ForegroundColor = ConsoleColor.Green;
-
-        // Calculate the starting position to center the prompt horizontally
-        int consoleWidth = Console.WindowWidth; // Get the width of the console window
-        int startPosition = (consoleWidth - prompt.Length) / 2; // Center alignment calculation
-
-        // Print the prompt at the calculated centered position
-        Console.SetCursorPosition(startPosition, Console.CursorTop); // Move the cursor to the starting position
-        Console.Write(prompt); // Display the prompt message
-
-        // Position the cursor immediately after the prompt for user input
-        Console.SetCursorPosition(startPosition + prompt.Length, Console.CursorTop);
-
-        // Read and validate user input
-        while (!int.TryParse(input = Console.ReadLine(), out speedInput) || speedInput < 1 || speedInput > 3)
+        if (string.IsNullOrWhiteSpace(input))
         {
-            if (string.IsNullOrWhiteSpace(input)) // If the user presses Enter without typing anything
-            {
-                speedInput = 2; // Default speed is 2
-                break; // Exit the loop
-            }
-            else
-            {
-                // Display an error message for invalid input
-                string error = "Invalid Input. Try Again...";
-                Console.SetCursorPosition((consoleWidth - error.Length) / 2, Console.CursorTop); // Center the error message
-                Console.WriteLine(error); // Show the error message
-
-                // Reprint the prompt after the error message, maintaining alignment
-                Console.SetCursorPosition(startPosition, Console.CursorTop); // Move cursor back to the prompt position
-                Console.Write(prompt); // Display the prompt again
-
-                // Position the cursor after the prompt for the next user input
-                Console.SetCursorPosition(startPosition + prompt.Length, Console.CursorTop);
-            }
+            speedInput = 2;
+            break;
         }
-
-        // Reset color to default after the prompt
-        Console.ResetColor();
-
-        // Define the speeds for different player selections
-        int[] velocities = { 100, 70, 50 };
-        int velocity = velocities[speedInput - 1];
-        char[] DirectionChars = { '^', 'v', '<', '>' };  // Symbols for direction of the snake
-        TimeSpan sleep = TimeSpan.FromMilliseconds(velocity);  // Adjust speed based on user input
-
-        int width = Console.WindowWidth;  // Get the current console width
-        int height = Console.WindowHeight;  // Get the current console height
-        Tile[,] map = new Tile[width, height];  // Create a map for the game grid
-        Direction? direction = null;  // The snake's current direction
-        Queue<(int X, int Y)> snake = new();  // Queue to store the snake's body positions
-        (int X, int Y) = (width / 2, height / 2);  // Start the snake at the center of the screen
-        bool closeRequested = false;  // Flag to check if the game should be closed
-        bool isPaused = false;  // Flag to check if the game is paused
-
-
-        try
+        else
         {
-            Console.CursorVisible = false;  // Hide the cursor during the game
-            Console.Clear();  // Clear the screen at the beginning
-            snake.Enqueue((X, Y));  // Add the starting position of the snake to the queue
-            map[X, Y] = Tile.Snake;  // Mark the starting position as part of the snake
-            PositionFood(map, width, height);  // Place food on the map
-            Console.SetCursorPosition(X, Y);  // Set the cursor to the snake's starting position
-            Console.Write('@');  // Display the snake's head on the screen
+            // Display an error message for invalid input
+            string error = "Invalid Input. Try Again...";
+            Console.SetCursorPosition((consoleWidth - error.Length) / 2, Console.CursorTop); // Center the error message
+            Console.WriteLine(error); // Show the error message
 
-            // Wait for the player to set the direction before starting the movement
-            while (!direction.HasValue && !closeRequested)
-            {
-                GetDirection(ref direction, ref closeRequested);  // Get the player's input for direction
-            }
+            // Reprint the prompt after the error message, maintaining alignment
+            Console.SetCursorPosition(startPosition, Console.CursorTop); // Move cursor back to the prompt position
+            Console.Write(prompt); // Display the prompt again
 
-            // Main game loop
-            while (!closeRequested)
-            {
-                // Check if the console window has been resized and end the game if so
-                if (Console.WindowWidth != width || Console.WindowHeight != height)
-                {
-                    Console.Clear();
-                    Console.Write("Console was resized. Snake game has ended.");
-                    return;  // End the game if the console size changes
-                }
-
-                // Check if a key is pressed to change the direction or pause the game
-                if (Console.KeyAvailable)
-                {
-                    var key = Console.ReadKey(true).Key;
-                    if (key == ConsoleKey.Enter)
-                    {
-                        isPaused = !isPaused;  // Toggle pause state
-                    }
-                    else
-                    {
-                        // Update direction based on key press
-                        switch (key)
-                        {
-                            case ConsoleKey.UpArrow:
-                                if (direction != Direction.Down) direction = Direction.Up; // Prevent reversing
-                                break;
-                            case ConsoleKey.DownArrow:
-                                if (direction != Direction.Up) direction = Direction.Down; // Prevent reversing
-                                break;
-                            case ConsoleKey.LeftArrow:
-                                if (direction != Direction.Right) direction = Direction.Left; // Prevent reversing
-                                break;
-                            case ConsoleKey.RightArrow:
-                                if (direction != Direction.Left) direction = Direction.Right; // Prevent reversing
-                                break;
-                            case ConsoleKey.Escape:
-                                closeRequested = true; // Allow the player to exit the game
-                                break;
-                        }
-                    }
-                }
-
-                // Only move the snake if the game is not paused
-                if (!isPaused)
-                {
-                    // Update the snake's position based on the current direction
-                    switch (direction)
-                    {
-                        case Direction.Up: Y--; break;
-                        case Direction.Down: Y++; break;
-                        case Direction.Left: X--; break;
-                        case Direction.Right: X++; break;
-                    }
-
-                    // Check if the snake collides with the walls or itself
-                    if (X < 0 || X >= width ||
-                    Y < 0 || Y >= height ||
-                    map[X, Y] is Tile.Snake)
-                    {
-                        // Call DisplayGameOver when the game ends due to collision
-                        DisplayGameOver(snake.Count - 1);  // Pass the score
-                        return;  // End the game
-                    }
-
-                    // Draw the new position of the snake
-                    Console.SetCursorPosition(X, Y);
-                    Console.Write(DirectionChars[(int)direction!]);  // Display the snake's current direction
-
-                    // Add the new position to the snake's body
-                    snake.Enqueue((X, Y));
-
-                    // If the snake eats food, generate new food and increase speed
-                    if (map[X, Y] is Tile.Food)
-                    {
-                        PositionFood(map, width, height);  // Place new food on the map
-                        velocity = Math.Max(10, velocity - 10);  // Increase speed, ensuring it doesn't go below a threshold
-                        sleep = TimeSpan.FromMilliseconds(velocity);  // Update sleep time based on new speed
-                    }
-                    else
-                    {
-                        // If no food is eaten, remove the last segment of the snake's body
-                        (int x, int y) = snake.Dequeue();
-                        map[x, y] = Tile.Open;  // Mark the old position as empty
-                        Console.SetCursorPosition(x, y);
-                        Console.Write(' ');  // Clear the old position
-                    }
-
-                    // Mark the current position as part of the snake's body
-                    map[X, Y] = Tile.Snake;
-
-                    // Check if a key is pressed to change the direction or pause the game
-                    if (Console.KeyAvailable)
-                    {
-                        var key = Console.ReadKey(true).Key;
-                        if (key == ConsoleKey.Enter)
-                        {
-                            isPaused = true;  // Pause the game
-                        }
-                        else
-                        {
-                            GetDirection(ref direction, ref closeRequested);  // Get the new direction from user input
-                        }
-                    }
-
-                    // Control the snake's speed
-                    System.Threading.Thread.Sleep(sleep);  // Pause for a brief moment based on the selected speed
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            exception = e;  // Catch any unexpected exceptions
-            throw;
-        }
-        finally
-        {
-            Console.CursorVisible = true;  // Show the cursor again after the game ends
-            Console.Clear();  // Clear the screen
-            Console.WriteLine(exception?.ToString() ?? "Snake was closed.");  // Display any exception message or closure info
+            // Position the cursor after the prompt for the next user input
+            Console.SetCursorPosition(startPosition + prompt.Length, Console.CursorTop);
         }
     }
-   
+    Console.ResetColor();
 
-    // Display the banner with the game banner 
-    static void DisplayBanner()
+    int[] velocities = { 100, 70, 50 };
+    int velocity = velocities[speedInput - 1];
+    char[] DirectionChars = { '■', '■', '■', '■' };
+    char[] listOfFoodChars = { '◉', '◆', '●', '◈' };
+    TimeSpan sleep = TimeSpan.FromMilliseconds(velocity);
+    int width = Console.WindowWidth;
+    int height = Console.WindowHeight;
+
+    int headerHeight = 1;
+    int footerHeight = 1;
+    int sideWidth = 1;
+
+    Tile[,] map = new Tile[width, height];
+    Direction? direction = null;
+    Queue<(int X, int Y)> snake = new();
+    (int X, int Y) = (2, 1);
+    bool closeRequested = false;
+    bool isPaused = false;  
+    Random random = new Random();
+
+    (int specialX, int specialY) = (-1, -1); // Special food variable
+    DateTime specialFoodSpawnTime = DateTime.MinValue;
+    TimeSpan specialFoodLifetime = TimeSpan.FromSeconds(7);
+    bool specialFoodActive = false;
+    int normalFoodCounter = 0; // Count the number of times normal food is eaten
+    bool specialFoodBlinking = false; // To control the blinking effect
+
+    void PositionFood()
+    {
+        int foodX, foodY;
+        do
+        {
+            foodX = random.Next(sideWidth, width - sideWidth);
+            foodY = random.Next(headerHeight, height - footerHeight - 1);
+        } while (map[foodX, foodY] != Tile.Open);
+
+        map[foodX, foodY] = Tile.Food;
+        Console.SetCursorPosition(foodX, foodY); 
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.Write(listOfFoodChars[random.Next(listOfFoodChars.Length)]);
+        Console.ResetColor();
+    }
+
+    void PositionSpecialFood()
+    {
+        do
+        {
+            specialX = random.Next(sideWidth, width - sideWidth);
+            specialY = random.Next(headerHeight, height - footerHeight - 1);
+        } while (map[specialX, specialY] != Tile.Open);
+
+        specialFoodActive = true;
+        specialFoodSpawnTime = DateTime.Now;
+        map[specialX, specialY] = Tile.Food;
+        Console.SetCursorPosition(specialX, specialY);
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Write('★');
+        Console.ResetColor();
+    }
+
+    void GetDirection()
+    {
+        var key = Console.ReadKey(intercept: true).Key;
+        direction = key switch
+        {
+            ConsoleKey.UpArrow => direction != Direction.Down ? Direction.Up : direction,
+            ConsoleKey.DownArrow => direction != Direction.Up ? Direction.Down : direction,
+            ConsoleKey.LeftArrow => direction != Direction.Right ? Direction.Left : direction,
+            ConsoleKey.RightArrow => direction != Direction.Left ? Direction.Right : direction,
+            _ => direction
+        };
+    }
+
+    void DrawConsole(int score, int currentVelocity)
+    {
+        int width = Console.WindowWidth;
+        int height = Console.WindowHeight;
+
+        string title = "[HUNTING SNAKE]🐍";
+        string speed = velocity == 100 ? "Slow" : velocity == 70 ? "Normal" : "Fast";
+        string headerSpeed = $"Speed: {speed}";
+        string footerPause = "[Space]: Pause the game";
+        string footerScore = $"Score: {score}";
+
+        //top border
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.SetCursorPosition(1, 0);
+        Console.Write('╔' + new string('═', width - 3) + '╗');
+
+        //header
+        Console.SetCursorPosition((width - title.Length) / 2, 0);
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Write(title);
+
+        Console.SetCursorPosition(width - headerSpeed.Length - 2, 0);
+        Console.ForegroundColor = ConsoleColor.Magenta;
+        Console.Write(headerSpeed);
+
+        //bottom border
+        Console.SetCursorPosition(1, height - 2);
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.Write('╚' + new string('═', width - 3) + '╝');
+
+        //side borders
+        for (int y = 1; y < height - 2; y++)
+        {
+            Console.SetCursorPosition(1, y);
+            Console.Write('║');
+            Console.SetCursorPosition(width - 1, y);
+            Console.Write('║');
+        }
+
+        //footer
+        Console.SetCursorPosition(2, height - 1);
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.Write("[ESC]: Exit");
+
+        Console.SetCursorPosition((width - footerPause.Length) / 2, height - 1);
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Write(footerPause);
+
+        Console.SetCursorPosition(width - footerScore.Length - 3, height - 1);
+        Console.ForegroundColor = ConsoleColor.Magenta;
+        Console.Write($"{footerScore} 🌟");
+
+        //reset color
+        Console.ResetColor();
+    }
+    void DisplayBanner()
     {
         string banner = @"
 ██╗  ██╗██╗   ██╗███╗   ██╗████████╗██╗███╗   ██╗ ██████╗       ██████╗███╗   ██╗ █████╗ ██╗  ██╗███████╗
@@ -251,9 +216,7 @@ class Program
         // Wait for the user to press any key to continue
         Console.ReadKey(true);
     }
-
-    // Helper function to center text on screen
-    static void CenterTextOnScreen(string text, int verticalPosition = -1)
+    void CenterTextOnScreen(string text, int verticalPosition = -1)
     {
         int consoleWidth = Console.WindowWidth;
         int consoleHeight = Console.WindowHeight;
@@ -276,11 +239,7 @@ class Program
             verticalPosition++;  // Move to the next line
         }
     }
-
-
-
-    // Display the game instructions to the player
-    static void DisplayInstructions()
+    void DisplayInstructions()
     {
         // Clear the screen for a clean slate to display the instructions 
         Console.Clear();
@@ -290,29 +249,21 @@ class Program
 |------------------------------------------------------------------|
 |                          Game Instructions:                      | 
 |------------------------------------------------------------------|
-1. Choose the Speed of the Snake:
-    Press 1: Slow 
-    Press 2: Normal  
-    Press 3: Fast   
-   -> If you press Enter without typing anything, the default speed (2) will be selected.
+1. Choose Speed:
+Press 1: Slow | 2: Normal (default) | 3: Fast
 
-2. Control the Snake's Direction:
-   Use the arrow keys on your keyboard to control the direction of the snake.
-   - Up Arrow: Move Up
-   - Down Arrow: Move Down
-   - Left Arrow: Move Left
-   - Right Arrow: Move Right
+2. Control Snake:
+Use arrow keys:
+↑: Up | ↓: Down | ←: Left | →: Right
 
-3. Game Objective:
-   The snake will grow longer each time it eats food.
-   Game Over Conditions: The game will end if the snake collides with the walls or runs into itself.
+3. Objective:
+Grow the snake by eating food. Game Over if it hits walls or itself.
 
-4. Pause and Resume:
-   To pause the game, press Enter.
-   To continue, press Enter again.
+4. Pause/Resume:
+Press Enter to pause or continue.
 
-5. Replay the Game:
-   After each game over, press Enter to restart the game.
+5. Replay:
+After Game Over, press Enter to restart.
 --------------------------------------------------------
 ";
 
@@ -320,9 +271,7 @@ class Program
         CenterTextOnScreen(instructions);
         Console.ReadKey(true); // Wait for the user to press any key before selecting the speed.
     }
-
-    // Function to center text horizontally in the console
-    static void CenterTextHorizontally(string text)
+    void CenterTextHorizontally(string text)
     {
         int consoleWidth = Console.WindowWidth;  // Get the width of the console window
         int horizontalCenter = (consoleWidth - text.Length) / 2;  // Calculate the center position
@@ -330,9 +279,7 @@ class Program
         Console.SetCursorPosition(horizontalCenter, Console.CursorTop);  // Set the cursor at the calculated position
         Console.WriteLine(text);  // Write the text at the center
     }
-
-    // Get the player's name
-    static string GetPlayerName()
+    string GetPlayerName()
     {
         Console.Clear();
 
@@ -375,59 +322,28 @@ class Program
         return playerName;
     }
 
-    static void GetDirection(ref Direction? direction, ref bool closeRequested)
+    void WaitForInputAndBlink()
     {
-        switch (Console.ReadKey(true).Key)
-        {
-            case ConsoleKey.UpArrow: direction = Direction.Up; break;
-            case ConsoleKey.DownArrow: direction = Direction.Down; break;
-            case ConsoleKey.LeftArrow: direction = Direction.Left; break;
-            case ConsoleKey.RightArrow: direction = Direction.Right; break;
-            case ConsoleKey.Escape: closeRequested = true; break;  // Allow the player to exit the game by pressing Escape
-        }
-    }
+        DateTime blinkStart = DateTime.Now;
+        bool visible = true;
 
-    // Position new food on the map at an empty tile
-    static void PositionFood(Tile[,] map, int width, int height)
-    {
-        List<(int X, int Y)> possibleCoordinates = new();
-        for (int i = 0; i < width; i++)
+        while (direction == null && !closeRequested)
         {
-            for (int j = 0; j < height; j++)
+            if ((DateTime.Now - blinkStart).Milliseconds >= 500)
             {
-                if (map[i, j] is Tile.Open)  // Find open spaces on the map
-                {
-                    possibleCoordinates.Add((i, j));  // Add the coordinates of open tiles to the list
-                }
+                Console.SetCursorPosition(X, Y);
+                Console.Write(visible ? ' ' : '▶');
+                visible = !visible;
+                blinkStart = DateTime.Now;
+            }
+
+            if (Console.KeyAvailable)
+            {
+                GetDirection();
             }
         }
-        if (possibleCoordinates.Count > 0)  // If there are empty tiles available
-        {
-            int index = Random.Shared.Next(possibleCoordinates.Count);  // Select a random tile for the food
-            (int X, int Y) = possibleCoordinates[index];  // Get the coordinates of the food
-            map[X, Y] = Tile.Food;  // Mark the tile as food
-            Console.SetCursorPosition(X, Y);  // Set the cursor to the food's position
-            Console.Write('+');  // Display the food
-        }
     }
-
-    // Enum to define the direction of the snake
-    enum Direction
-    {
-        Up = 0,
-        Down = 1,
-        Left = 2,
-        Right = 3,
-    }
-
-    // Enum to represent the tiles on the game map
-    enum Tile
-    {
-        Open = 0,  // Empty tile
-        Snake,     // Part of the snake
-        Food,      // Food item
-    }
-    static void DisplayGameOver(int score)
+    void DisplayGameOver(int score)
     {
         Console.Clear();
         // Set the color for the "GAME OVER" text
@@ -454,14 +370,203 @@ Your final score: " + (score == 0 ? "0 " : score.ToString());
         ConsoleKey key = Console.ReadKey(true).Key;
         if (key == ConsoleKey.Enter)
         {
-            // Play again: call the Main function or restart the game
-            Main();
+            playAgain = true;
         }
-        else if (key == ConsoleKey.Escape)
+    }
+    try
+    {
+        Console.CursorVisible = false;
+        Console.Clear();
+        DrawConsole(0, velocity);
+        snake.Enqueue((X, Y));
+        map[X, Y] = Tile.Snake;
+        PositionFood();
+        Console.SetCursorPosition(X, Y);
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.Write("▶︎");
+        Console.ResetColor();
+
+        WaitForInputAndBlink();
+        //Main game loop
+        while (!closeRequested)
         {
-            // Exit the game
-            return;
+            if (Console.WindowWidth != width || Console.WindowHeight != height)
+            {
+                Console.Clear();
+                Console.Write("Console was resized. Snake game has ended.");
+                return;
+            }
+            // Check if a key is pressed to change the direction or pause the game
+            if (Console.KeyAvailable)
+            {
+                var key = Console.ReadKey(true).Key;
+                if (key == ConsoleKey.Enter)
+                {
+                    isPaused = !isPaused;  // Toggle pause state
+                }
+                else
+                {
+                    // Update direction based on key press
+                    switch (key)
+                    {
+                        case ConsoleKey.UpArrow:
+                            if (direction != Direction.Down) direction = Direction.Up; // Prevent reversing
+                            break;
+                        case ConsoleKey.DownArrow:
+                            if (direction != Direction.Up) direction = Direction.Down; // Prevent reversing
+                            break;
+                        case ConsoleKey.LeftArrow:
+                            if (direction != Direction.Right) direction = Direction.Left; // Prevent reversing
+                            break;
+                        case ConsoleKey.RightArrow:
+                            if (direction != Direction.Left) direction = Direction.Right; // Prevent reversing
+                            break;
+                        case ConsoleKey.Escape:
+                            closeRequested = true; // Allow the player to exit the game
+                            break;
+                    }
+                }
+            }
+            // Only move the snake if the game is not paused
+            if (!isPaused)
+            {
+                // Update the snake's position based on the current direction
+
+
+                switch (direction)
+                {
+                    case Direction.Up: Y--; break;
+                    case Direction.Down: Y++; break;
+                    case Direction.Left: X--; break;
+                    case Direction.Right: X++; break;
+                }
+
+                if (Y < headerHeight || Y >= (height - footerHeight - 1) || X <= sideWidth || X >= (width - sideWidth) ||
+                    map[X, Y] is Tile.Snake)
+                {
+                    WindowsMediaPlayer crashSound = new WindowsMediaPlayer();
+                    crashSound.URL = @"C:\\GiaoDienChoiGame\\GiaoDienChoiGame\\snakeHittingSound.wav";
+                    crashSound.controls.play();
+                    Console.Clear();
+                    //string? replayInput = Console.ReadLine();
+                    DisplayGameOver(snake.Count - 1);
+                    playAgain = playAgain;
+                    break;
+                }
+
+                Console.SetCursorPosition(X, Y);
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write(DirectionChars[(int)direction!]);
+                Console.ResetColor();
+                snake.Enqueue((X, Y));
+
+                if (map[X, Y] is Tile.Food)
+                {
+                    velocity = Math.Max(velocity - 2, 10);  // Increase speed, ensuring it doesn't go below a threshold
+                    sleep = TimeSpan.FromMilliseconds(velocity);
+                    WindowsMediaPlayer eatSound = new WindowsMediaPlayer();
+                    eatSound.URL = @"C:\\GiaoDienChoiGame\\GiaoDienChoiGame\\snakeEatingSound.wav";
+                    eatSound.controls.play();
+                    PositionFood();
+
+                    normalFoodCounter++;
+
+                    if (normalFoodCounter % 5 == 0)
+                    {
+                        PositionSpecialFood();
+                    }
+                }
+                else if (specialFoodActive && X == specialX && Y == specialY)
+                {
+                    specialFoodActive = false;
+
+                    map[specialX, specialY] = Tile.Open;
+                    Console.SetCursorPosition(specialX, specialY);
+                    Console.Write(' ');
+                    snake.Enqueue((X, Y));
+                    snake.Enqueue((X, Y));
+
+                    WindowsMediaPlayer specialEatSound = new WindowsMediaPlayer();
+                    specialEatSound.URL = @"C:\\GiaoDienChoiGame\\GiaoDienChoiGame\\snakeEatingSound.wav";
+                    specialEatSound.controls.play();
+                }
+                else
+                {
+                    (int x, int y) = snake.Dequeue();
+                    map[x, y] = Tile.Open;
+                    Console.SetCursorPosition(x, y);
+                    Console.Write(' ');
+                }
+
+                map[X, Y] = Tile.Snake;
+
+                if (specialFoodActive)
+                {
+                    var timeElapsed = DateTime.Now - specialFoodSpawnTime;
+
+                    if (timeElapsed > specialFoodLifetime)
+                    {
+                        specialFoodActive = false;
+                        Console.SetCursorPosition(specialX, specialY);
+                        Console.Write(' ');
+                    }
+                    else if (timeElapsed > specialFoodLifetime - TimeSpan.FromSeconds(1))
+                    {
+                        specialFoodBlinking = !specialFoodBlinking;
+                        Console.SetCursorPosition(specialX, specialY);
+                        Console.ForegroundColor = specialFoodBlinking ? ConsoleColor.Yellow : ConsoleColor.Black;
+                        Console.Write('★');
+                        Console.ResetColor();
+                    }
+                }
+
+                if (Console.KeyAvailable)
+                {
+                    GetDirection();
+                }
+
+                DrawConsole(snake.Count - 1, velocity);
+                System.Threading.Thread.Sleep(sleep);
+            }
+            else
+            {
+                DisplayPausedBanner();
+
+            }
+
+        }
+        void DisplayPausedBanner()
+        {
+            Console.SetCursorPosition(0, 0); // Set cursor to the top of the console
+            Console.ForegroundColor = ConsoleColor.Yellow; // Change text color for visibility
+            Console.WriteLine("PAUSED"); // Display the PAUSED message
+            Console.ResetColor(); // Reset text color to default
         }
     }
 
+    catch (Exception e)
+    {
+        exception = e;
+        throw;
+    }
+    finally
+    {
+        Console.CursorVisible = true;
+        Console.Clear();
+        Console.WriteLine(exception?.ToString() ?? "Snake was closed.");
+    }
+} while (playAgain);
+enum Direction
+{
+    Up = 0,
+    Down = 1,
+    Left = 2,
+    Right = 3,
+}
+
+enum Tile
+{
+    Open = 0,
+    Snake,
+    Food,
 }
